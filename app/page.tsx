@@ -1,69 +1,140 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect, useRef } from 'react';
+import { initialTickets, Ticket } from '../data';
+
+export default function TaskLiaison() {
+  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+  
+  // This ref ensures we only register the tools once, bypassing React Strict Mode issues
+  const isRegistered = useRef(false);
+
+  useEffect(() => {
+    // If already registered, stop immediately
+    if (isRegistered.current) return; 
+
+    const modelContext = (document as any).modelContext;
+    
+    if (modelContext) {
+      isRegistered.current = true; // Mark as registered so it never runs again
+      
+      // TOOL 1: The Bounty Poster
+      modelContext.registerTool({
+        name: "post_bounty_to_market",
+        description: "Moves a critical infrastructure ticket to the open market and assigns a bounty point value.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            ticketId: { type: "string", description: "The ID of the ticket (e.g., INC-101)" },
+            bountyPoints: { type: "number", description: "The calculated point value for the bounty (e.g., 500)" }
+          },
+          required: ["ticketId", "bountyPoints"]
+        },
+        execute: async (input: { ticketId: string; bountyPoints: number }) => {
+          setTickets(prevTickets => 
+            prevTickets.map(t => 
+              t.id === input.ticketId 
+                ? { ...t, status: 'Market', bountyPoints: input.bountyPoints } 
+                : t
+            )
+          );
+          return {
+            content: [{ type: "text", text: `Success: Ticket ${input.ticketId} is now on the market with a ${input.bountyPoints} point bounty.` }]
+          };
+        }
+      });
+
+      // TOOL 2: The AI Negotiator
+      modelContext.registerTool({
+        name: "propose_ticket_swap",
+        description: "Assigns a critical ticket to an engineer and moves one of their low-priority tickets back to the open queue to balance workload.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            engineerName: { type: "string", description: "Name of the engineer (e.g., Alex)" },
+            ticketToAssign: { type: "string", description: "ID of the critical ticket to assign (e.g., INC-101)" },
+            ticketToRemove: { type: "string", description: "ID of the low-priority ticket to remove from their queue (e.g., INC-103)" }
+          },
+          required: ["engineerName", "ticketToAssign", "ticketToRemove"]
+        },
+        execute: async (input: { engineerName: string; ticketToAssign: string; ticketToRemove: string }) => {
+          setTickets(prevTickets => 
+            prevTickets.map(t => {
+              if (t.id === input.ticketToAssign) {
+                return { ...t, status: 'Assigned', assignee: input.engineerName, bountyPoints: 0 };
+              }
+              if (t.id === input.ticketToRemove) {
+                return { ...t, status: 'Open', assignee: null };
+              }
+              return t;
+            })
+          );
+          
+          return {
+            content: [{ 
+              type: "text", 
+              text: `Negotiation successful. Assigned ${input.ticketToAssign} to ${input.engineerName} and removed ${input.ticketToRemove} from their queue.` 
+            }]
+          };
+        }
+      });
+
+      console.log("WebMCP Tools registered successfully.");
+    }
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen flex w-full bg-gray-50 text-gray-900">
+      
+      {/* LEFT: Manager Command Center */}
+      <div className="w-1/2 p-8 border-r border-gray-300">
+        <h1 className="text-2xl font-bold mb-6">Task-Liaison: Command Center (Rahman)</h1>
+        
+        <div className="space-y-4">
+          {tickets.filter(t => t.status === 'Open').map(ticket => (
+            <div key={ticket.id} className="p-4 bg-white shadow rounded border-l-4 border-red-500 flex justify-between items-center">
+              <div>
+                <h3 className="font-semibold">{ticket.title}</h3>
+                <p className="text-sm text-gray-500">Severity: {ticket.severity}</p>
+                <p className="text-xs text-gray-400 mt-1">ID: {ticket.id}</p>
+              </div>
+            </div>
+          ))}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </div>
+
+      {/* RIGHT: Engineer View (Alex) */}
+      <div className="w-1/2 p-8 bg-gray-100">
+        <h1 className="text-2xl font-bold mb-6">Engineer View: Alex</h1>
+        
+        <h2 className="text-lg font-semibold mb-2">Active Queue</h2>
+        <div className="space-y-4 mb-8">
+          {tickets.filter(t => t.assignee === 'Alex').map(ticket => (
+            <div key={ticket.id} className="p-4 bg-white shadow rounded">
+              <h3 className="font-semibold">{ticket.title}</h3>
+              <p className="text-xs text-gray-400 mt-2">ID: {ticket.id} | Severity: {ticket.severity}</p>
+            </div>
+          ))}
         </div>
-      </main>
+
+        <h2 className="text-lg font-semibold mb-2 text-green-700">Open Bounty Market</h2>
+        <div className="space-y-4">
+          {tickets.filter(t => t.status === 'Market').map(ticket => (
+            <div key={ticket.id} className="p-4 bg-green-50 shadow rounded border border-green-200">
+              <div className="flex justify-between items-start">
+                <div>
+                  <h3 className="font-semibold">{ticket.title}</h3>
+                  <p className="text-xs text-green-600 mt-1">ID: {ticket.id}</p>
+                </div>
+                <span className="bg-green-200 text-green-800 text-xs px-2 py-1 rounded font-bold">
+                  {ticket.bountyPoints} pts
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
     </div>
   );
 }
