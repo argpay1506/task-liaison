@@ -72,7 +72,7 @@ export default function TaskLiaison() {
         }
       });
 
-      // TOOL 3: Blast Radius Analyzer (NEW)
+      // TOOL 3: Blast Radius Analyzer
       modelContext.registerTool({
         name: "analyze_blast_radius",
         description: "Analyzes a ticket and renders the downstream services that will be impacted if not resolved.",
@@ -94,7 +94,7 @@ export default function TaskLiaison() {
         }
       });
 
-      // TOOL 4: Stage Remediation Script (NEW)
+      // TOOL 4: Stage Remediation Script
       modelContext.registerTool({
         name: "stage_remediation_script",
         description: "Drafts a shell, Terraform, or workflow patch and stages it in the UI for human review.",
@@ -128,7 +128,7 @@ export default function TaskLiaison() {
               </div>
               <p className="text-sm text-gray-500 mb-3">ID: {ticket.id} | Severity: {ticket.severity}</p>
               
-              {/* NEW: Blast Radius Visualizer */}
+              {/* Blast Radius Visualizer */}
               {ticket.blastRadius && (
                 <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded">
                   <p className="text-xs font-bold text-red-800 mb-1">⚠️ CASCADING IMPACT DETECTED:</p>
@@ -142,11 +142,11 @@ export default function TaskLiaison() {
                 </div>
               )}
 
-              {/* NEW: Remediation Sandbox */}
+              {/* Remediation Sandbox */}
               {ticket.remediationScript && (
                 <div className="mt-4">
                   <p className="text-xs font-bold text-blue-800 mb-1">🤖 AI STAGED REMEDIATION (Awaiting Approval):</p>
-                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto">
+                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
                     {ticket.remediationScript}
                   </pre>
                   <button className="mt-2 w-full bg-blue-600 text-white text-xs py-2 rounded hover:bg-blue-700">
@@ -169,6 +169,33 @@ export default function TaskLiaison() {
             <div key={ticket.id} className="p-4 bg-white shadow rounded">
               <h3 className="font-semibold">{ticket.title}</h3>
               <p className="text-xs text-gray-400 mt-2">ID: {ticket.id} | Severity: {ticket.severity}</p>
+              
+              {/* Blast Radius Visualizer (Added to Alex's Queue) */}
+              {ticket.blastRadius && (
+                <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded">
+                  <p className="text-xs font-bold text-red-800 mb-1">⚠️ CASCADING IMPACT DETECTED:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {ticket.blastRadius.map(service => (
+                      <span key={service} className="bg-red-200 text-red-900 text-xs px-2 py-1 rounded">
+                        {service}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Remediation Sandbox (Added to Alex's Queue) */}
+              {ticket.remediationScript && (
+                <div className="mt-4">
+                  <p className="text-xs font-bold text-blue-800 mb-1">🤖 AI STAGED REMEDIATION (Awaiting Approval):</p>
+                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                    {ticket.remediationScript}
+                  </pre>
+                  <button className="mt-2 w-full bg-blue-600 text-white text-xs py-2 rounded hover:bg-blue-700">
+                    Approve & Execute Patch
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
