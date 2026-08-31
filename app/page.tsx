@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 
-// Upgraded Ticket Type
+// Upgraded Ticket Type with scriptExecuted flag
 export type Ticket = {
   id: string;
   title: string;
@@ -12,6 +12,7 @@ export type Ticket = {
   bountyPoints: number;
   blastRadius?: string[];
   remediationScript?: string;
+  scriptExecuted?: boolean; 
 };
 
 const initialTickets: Ticket[] = [
@@ -24,6 +25,22 @@ export default function TaskLiaison() {
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
   const isRegistered = useRef(false);
 
+  // --- HUMAN UI ACTIONS ---
+  
+  const handleApprovePatch = (ticketId: string) => {
+    setTickets(prev => prev.map(t => 
+      t.id === ticketId ? { ...t, scriptExecuted: true } : t
+    ));
+  };
+
+  const handleClaimBounty = (ticketId: string) => {
+    setTickets(prev => prev.map(t => 
+      t.id === ticketId ? { ...t, status: 'Assigned', assignee: 'Alex' } : t
+    ));
+  };
+
+  // --- AI AGENT ACTIONS (WebMCP) ---
+
   useEffect(() => {
     if (isRegistered.current) return; 
     const modelContext = (document as any).modelContext;
@@ -31,10 +48,9 @@ export default function TaskLiaison() {
     if (modelContext) {
       isRegistered.current = true; 
       
-      // TOOL 1: The Bounty Poster
       modelContext.registerTool({
         name: "post_bounty_to_market",
-        description: "Moves a critical ticket to the open market and assigns a bounty point value.",
+        description: "Moves a critical ticket to the Priority Reward Exchange and assigns a bounty point value.",
         inputSchema: {
           type: "object",
           properties: {
@@ -45,11 +61,10 @@ export default function TaskLiaison() {
         },
         execute: async (input: { ticketId: string; bountyPoints: number }) => {
           setTickets(prev => prev.map(t => t.id === input.ticketId ? { ...t, status: 'Market', bountyPoints: input.bountyPoints } : t));
-          return { content: [{ type: "text", text: `Success: Ticket ${input.ticketId} on market for ${input.bountyPoints} pts.` }] };
+          return { content: [{ type: "text", text: `Success: Ticket ${input.ticketId} posted to exchange for ${input.bountyPoints} pts.` }] };
         }
       });
 
-      // TOOL 2: The AI Negotiator
       modelContext.registerTool({
         name: "propose_ticket_swap",
         description: "Assigns a critical ticket to an engineer and moves a low-priority ticket back to the open queue.",
@@ -72,7 +87,6 @@ export default function TaskLiaison() {
         }
       });
 
-      // TOOL 3: Blast Radius Analyzer
       modelContext.registerTool({
         name: "analyze_blast_radius",
         description: "Analyzes a ticket and renders the downstream services that will be impacted if not resolved.",
@@ -94,7 +108,6 @@ export default function TaskLiaison() {
         }
       });
 
-      // TOOL 4: Stage Remediation Script
       modelContext.registerTool({
         name: "stage_remediation_script",
         description: "Drafts a shell, Terraform, or workflow patch and stages it in the UI for human review.",
@@ -107,7 +120,7 @@ export default function TaskLiaison() {
           required: ["ticketId", "scriptContent"]
         },
         execute: async (input: { ticketId: string; scriptContent: string }) => {
-          setTickets(prev => prev.map(t => t.id === input.ticketId ? { ...t, remediationScript: input.scriptContent } : t));
+          setTickets(prev => prev.map(t => t.id === input.ticketId ? { ...t, remediationScript: input.scriptContent, scriptExecuted: false } : t));
           return { content: [{ type: "text", text: `Remediation script staged for ${input.ticketId}. Awaiting human approval.` }] };
         }
       });
@@ -117,41 +130,41 @@ export default function TaskLiaison() {
   return (
     <div className="min-h-screen flex w-full bg-gray-50 text-gray-900">
       
-      {/* LEFT: Manager Command Center */}
-      <div className="w-1/2 p-8 border-r border-gray-300 overflow-y-auto">
-        <h1 className="text-2xl font-bold mb-6">Task-Liaison: Command Center (Rahman)</h1>
+      {/* COLUMN 1: Manager Command Center */}
+      <div className="w-1/3 p-6 border-r border-gray-300 overflow-y-auto bg-white">
+        <h1 className="text-xl font-bold mb-6 text-gray-800">Command Center</h1>
         <div className="space-y-6">
           {tickets.filter(t => t.status === 'Open').map(ticket => (
-            <div key={ticket.id} className="p-4 bg-white shadow rounded border-l-4 border-red-500">
-              <div className="flex justify-between items-start mb-2">
-                <h3 className="font-semibold text-lg">{ticket.title}</h3>
-              </div>
-              <p className="text-sm text-gray-500 mb-3">ID: {ticket.id} | Severity: {ticket.severity}</p>
+            <div key={ticket.id} className="p-4 bg-gray-50 shadow-sm rounded border-l-4 border-red-500">
+              <h3 className="font-semibold text-md">{ticket.title}</h3>
+              <p className="text-xs text-gray-500 mt-2 mb-3">ID: {ticket.id} | Severity: {ticket.severity}</p>
               
-              {/* Blast Radius Visualizer */}
               {ticket.blastRadius && (
                 <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded">
                   <p className="text-xs font-bold text-red-800 mb-1">⚠️ CASCADING IMPACT DETECTED:</p>
                   <div className="flex flex-wrap gap-2">
                     {ticket.blastRadius.map(service => (
-                      <span key={service} className="bg-red-200 text-red-900 text-xs px-2 py-1 rounded">
-                        {service}
-                      </span>
+                      <span key={service} className="bg-red-200 text-red-900 text-xs px-2 py-1 rounded">{service}</span>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Remediation Sandbox */}
               {ticket.remediationScript && (
                 <div className="mt-4">
                   <p className="text-xs font-bold text-blue-800 mb-1">🤖 AI STAGED REMEDIATION (Awaiting Approval):</p>
-                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap mb-2">
                     {ticket.remediationScript}
                   </pre>
-                  <button className="mt-2 w-full bg-blue-600 text-white text-xs py-2 rounded hover:bg-blue-700">
-                    Approve & Execute Patch
-                  </button>
+                  {!ticket.scriptExecuted ? (
+                    <button onClick={() => handleApprovePatch(ticket.id)} className="w-full bg-blue-600 text-white text-xs font-bold py-2 rounded hover:bg-blue-700 transition-colors">
+                      Approve & Execute Patch
+                    </button>
+                  ) : (
+                    <div className="w-full bg-green-100 border border-green-300 text-green-800 text-center text-xs font-bold py-2 rounded">
+                      ✅ Patch Applied Successfully
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -159,60 +172,80 @@ export default function TaskLiaison() {
         </div>
       </div>
 
-      {/* RIGHT: Engineer View (Alex) */}
-      <div className="w-1/2 p-8 bg-gray-100 overflow-y-auto">
-        <h1 className="text-2xl font-bold mb-6">Engineer View: Alex</h1>
-        
-        <h2 className="text-lg font-semibold mb-2">Active Queue</h2>
-        <div className="space-y-4 mb-8">
-          {tickets.filter(t => t.assignee === 'Alex').map(ticket => (
-            <div key={ticket.id} className="p-4 bg-white shadow rounded">
-              <h3 className="font-semibold">{ticket.title}</h3>
-              <p className="text-xs text-gray-400 mt-2">ID: {ticket.id} | Severity: {ticket.severity}</p>
+      {/* COLUMN 2: Priority Reward Exchange */}
+      <div className="w-1/3 p-6 border-r border-gray-300 overflow-y-auto bg-slate-100">
+        <h1 className="text-xl font-bold mb-6 text-indigo-900">Priority Reward Exchange</h1>
+        <div className="space-y-4">
+          {tickets.filter(t => t.status === 'Market').map(ticket => (
+            <div key={ticket.id} className="p-4 bg-white shadow rounded border border-indigo-200">
+              <h3 className="font-semibold text-indigo-900">{ticket.title}</h3>
+              <p className="text-xs text-indigo-700 mt-1 mb-3">ID: {ticket.id}</p>
               
-              {/* Blast Radius Visualizer (Added to Alex's Queue) */}
+              <div className="flex justify-between items-center pt-3 border-t border-indigo-100">
+                <span className="bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded font-bold whitespace-nowrap">
+                  Reward: {ticket.bountyPoints} pts
+                </span>
+                <button 
+                  onClick={() => handleClaimBounty(ticket.id)}
+                  className="bg-indigo-600 text-white text-xs font-bold px-4 py-1.5 rounded hover:bg-indigo-700 transition-colors"
+                >
+                  Claim Issue
+                </button>
+              </div>
+            </div>
+          ))}
+          {tickets.filter(t => t.status === 'Market').length === 0 && (
+            <div className="text-center text-sm text-gray-400 italic mt-10">
+              The exchange is currently empty.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* COLUMN 3: Engineer View */}
+      <div className="w-1/3 p-6 bg-gray-50 overflow-y-auto">
+        <h1 className="text-xl font-bold mb-6 text-gray-800">Engineer View: Alex</h1>
+        <div className="space-y-4">
+          {tickets.filter(t => t.assignee === 'Alex').map(ticket => (
+            <div key={ticket.id} className="p-4 bg-white shadow-sm rounded relative border border-gray-200">
+              
+              {ticket.bountyPoints > 0 && (
+                 <span className="absolute top-4 right-4 bg-indigo-100 text-indigo-800 text-xs px-2 py-1 rounded font-bold">
+                   +{ticket.bountyPoints} pts
+                 </span>
+              )}
+
+              <h3 className="font-semibold pr-16 text-md">{ticket.title}</h3>
+              <p className="text-xs text-gray-500 mt-2">ID: {ticket.id} | Severity: {ticket.severity}</p>
+              
               {ticket.blastRadius && (
                 <div className="mt-3 p-3 bg-red-50 border border-red-100 rounded">
                   <p className="text-xs font-bold text-red-800 mb-1">⚠️ CASCADING IMPACT DETECTED:</p>
                   <div className="flex flex-wrap gap-2">
                     {ticket.blastRadius.map(service => (
-                      <span key={service} className="bg-red-200 text-red-900 text-xs px-2 py-1 rounded">
-                        {service}
-                      </span>
+                      <span key={service} className="bg-red-200 text-red-900 text-xs px-2 py-1 rounded">{service}</span>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Remediation Sandbox (Added to Alex's Queue) */}
               {ticket.remediationScript && (
                 <div className="mt-4">
                   <p className="text-xs font-bold text-blue-800 mb-1">🤖 AI STAGED REMEDIATION (Awaiting Approval):</p>
-                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap">
+                  <pre className="bg-gray-800 text-green-400 p-3 rounded text-xs overflow-x-auto whitespace-pre-wrap mb-2">
                     {ticket.remediationScript}
                   </pre>
-                  <button className="mt-2 w-full bg-blue-600 text-white text-xs py-2 rounded hover:bg-blue-700">
-                    Approve & Execute Patch
-                  </button>
+                  {!ticket.scriptExecuted ? (
+                    <button onClick={() => handleApprovePatch(ticket.id)} className="w-full bg-blue-600 text-white text-xs font-bold py-2 rounded hover:bg-blue-700 transition-colors">
+                      Approve & Execute Patch
+                    </button>
+                  ) : (
+                    <div className="w-full bg-green-100 border border-green-300 text-green-800 text-center text-xs font-bold py-2 rounded">
+                      ✅ Patch Applied Successfully
+                    </div>
+                  )}
                 </div>
               )}
-            </div>
-          ))}
-        </div>
-
-        <h2 className="text-lg font-semibold mb-2 text-green-700">Open Bounty Market</h2>
-        <div className="space-y-4">
-          {tickets.filter(t => t.status === 'Market').map(ticket => (
-            <div key={ticket.id} className="p-4 bg-green-50 shadow rounded border border-green-200">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="font-semibold text-green-900">{ticket.title}</h3>
-                  <p className="text-xs text-green-700 mt-1">ID: {ticket.id}</p>
-                </div>
-                <span className="bg-green-200 text-green-900 text-xs px-2 py-1 rounded font-bold whitespace-nowrap ml-2">
-                  {ticket.bountyPoints} pts
-                </span>
-              </div>
             </div>
           ))}
         </div>
